@@ -1,7 +1,7 @@
 import sys
 
 from app.core.logger import logger, node_log
-from app.import_process.agent.state import ImportGraphState
+from app.import_process.agent.state import ImportGraphState, create_default_state
 from app.utils.task_utils import add_running_task, add_done_task
 from pathlib import Path
 
@@ -74,3 +74,35 @@ def node_entry(state: ImportGraphState) -> ImportGraphState:
     add_done_task(state["task_id"],"node_entry")
 
     return state
+
+if __name__ == '__main__':
+
+    # 单元测试：覆盖不支持类型、MD、PDF三种场景
+    logger.info("===== 开始node_entry节点单元测试 =====")
+
+    # 测试1: 不支持的TXT文件
+    test_state1 = create_default_state(
+        task_id="test_task_001",
+        local_file_path="联想海豚用户手册.txt"
+    )
+    node_entry(test_state1)
+
+    logger.info(f"测试1结果: {test_state1}")
+
+    # 测试2: MD文件
+    test_state2 = create_default_state(
+        task_id="test_task_002",
+        local_file_path="小米用户手册.md"
+    )
+    node_entry(test_state2)
+
+    logger.info(f"测试2结果: {test_state2}")
+
+    # 测试3: PDF文件
+    test_state3 = create_default_state(
+        task_id="test_task_003",
+        local_file_path="万用表的使用.pdf"
+    )
+    node_entry(test_state3)
+
+    logger.info("===== 结束node_entry节点单元测试 =====")
