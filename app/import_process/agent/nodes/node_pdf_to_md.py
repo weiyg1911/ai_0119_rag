@@ -68,6 +68,7 @@ def node_pdf_to_md(state: ImportGraphState) -> ImportGraphState:
             没有文件夹 -> 创建文件mkdir
          5. 返回两个路径地址
 """
+@step_log("validate_paths 校验pdf和输出地址")
 def validate_paths(state: ImportGraphState) -> Tuple[Path, Path]:
     
     pdf_path = state["pdf_path"]
@@ -108,6 +109,7 @@ def validate_paths(state: ImportGraphState) -> Tuple[Path, Path]:
          4. 轮询获取返回结果(zip_url) [batch_id]
          5. 返回zip_url
 """
+@step_log("upload_and_poll minerU进行交互获取md解析后压缩包地址")
 def upload_and_poll(pdf_path_obj)-> str:
     base_url = mineru_config.base_url
     api_key = mineru_config.api_key
@@ -239,6 +241,7 @@ def upload_and_poll(pdf_path_obj)-> str:
          6. 进行md文件的命名确定 [xx.pdf -> full.md -> xx.md]
          7. 返回md_path_obj地址
 """
+@step_log("download_and_extract 下载提取和解压")
 def download_and_extract(zip_url, local_dir_path_obj, stem):
 
     response = requests.get(zip_url, timeout=30)
