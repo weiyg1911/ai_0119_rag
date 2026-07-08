@@ -154,7 +154,7 @@ def upload_and_poll(pdf_path_obj)-> str:
 
 
     # 避免代理污染网络请求
-    with requests.sessions() as session:
+    with requests.Session() as session:
         session.trust_env = False
         upload_res = session.post(file_upload_url, data=file_bytes)
         http_status_code = upload_res.status_code
@@ -213,12 +213,12 @@ def upload_and_poll(pdf_path_obj)-> str:
                         raise RuntimeError(msg)
                     return extract_result_url
                 elif extract_result['state'] == 'failed':
-                    msg = f"已经完成了解析，但是失败了，失败信息：{extract_result["err_msg"]}"
+                    msg = f"已经完成了解析，但是失败了，失败信息：{extract_result}"
                     logger.error(msg)
                     raise RuntimeError("msg")
                     break
                 else:
-                    logger.info(f"解析进行中，{extract_result["state"]}")
+                    logger.info(f"解析进行中，{extract_result['state']}")
                     time.sleep(interval_time)
                     continue
             pass
@@ -243,3 +243,26 @@ def download_and_extract(zip_url, local_dir_path, pdf_path_obj):
 
 
     pass
+
+
+if __name__ == "__main__":
+
+    # 单元测试：验证PDF转MD全流程
+    logger.info("===== 开始node_pdf_to_md节点单元测试 =====")
+
+    from app.utils.path_util import PROJECT_ROOT
+    logger.info(f"测试获取根地址：{PROJECT_ROOT}")
+
+    test_pdf_name = os.path.join("doc", "hak180产品安全手册.pdf")
+    test_pdf_path = os.path.join(PROJECT_ROOT, test_pdf_name)
+
+    # 构造测试状态
+    test_state = create_default_state(
+        task_id="test_pdf2md_task_001",
+        pdf_path=test_pdf_path,
+        local_dir=os.path.join(PROJECT_ROOT, "output")
+    )
+
+    node_pdf_to_md(test_state)
+
+    logger.info("===== 结束node_pdf_to_md节点单元测试 =====")
