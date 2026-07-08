@@ -43,7 +43,7 @@ def node_pdf_to_md(state: ImportGraphState) -> ImportGraphState:
     zip_url = upload_and_poll(pdf_path_obj)
 
     # 4. step_3_download_and_extract 下载提取和解压
-    md_path_obj = download_and_extract(zip_url, local_dir_obj.path, pdf_path_obj)
+    md_path_obj = download_and_extract(Path(zip_url), local_dir_obj.path, pdf_path_obj)
 
 
     # 5. 根据md地址读取对应md_content内容,并且更新state
@@ -122,7 +122,7 @@ def upload_and_poll(pdf_path_obj)-> str:
     }
     data = {
         "files": [
-            {"name":f"{pdf_path_obj.stem}"}
+            {"name":f"{pdf_path_obj.name}"}
         ],
         "model_version":"vlm"
     }
@@ -156,7 +156,7 @@ def upload_and_poll(pdf_path_obj)-> str:
     # 避免代理污染网络请求
     with requests.Session() as session:
         session.trust_env = False
-        upload_res = session.post(file_upload_url, data=file_bytes)
+        upload_res = session.put(file_upload_url, data=file_bytes)
         http_status_code = upload_res.status_code
         if not http_status_code == 200:
             msg = f"上传文件失败，返回状态码为:{http_status_code}, 请检查minerU的配置"
