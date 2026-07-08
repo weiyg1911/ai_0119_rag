@@ -43,7 +43,7 @@ def node_pdf_to_md(state: ImportGraphState) -> ImportGraphState:
     zip_url = upload_and_poll(pdf_path_obj)
 
     # 4. step_3_download_and_extract 下载提取和解压
-    md_path_obj = download_and_extract(Path(zip_url), local_dir_obj, pdf_path_obj)
+    md_path_obj = download_and_extract(zip_url, local_dir_obj, pdf_path_obj.stem)
 
 
     # 5. 根据md地址读取对应md_content内容,并且更新state
@@ -248,18 +248,33 @@ def download_and_extract(zip_url, local_dir_path_obj, stem):
     md_path_dir.write_bytes(response.content)
 
     extract_path_obj = local_dir_path_obj / stem
-    if extract_path_obj.exits():
+    if extract_path_obj.exists():
         shutil.rmtree(extract_path_obj)
 
     extract_path_obj.mkdir(parents=True, exist_ok=True)
 
     shutil.unpack_archive(md_path_dir, extract_path_obj)
 
+    md_file_list =  list(extract_path_obj.rglob("*.md"))
 
+    if not md_file_list or len(md_file_list) == 0:
+        msg = f"文件解压失败，在{extract_path_obj}下没有任何md文件"
+        logger.error(msg)
+        raise FileNotFoundError(msg)
 
+    target_md_obj = None
+    for md_file in md_file_list:
+        if md_file.stem == stem:
+            target_md_obj = md_file
+            break
 
+    if not target_md_obj:
+        target_md_obj = md_file_list[0]
 
-    pass
+    final_md_path_obj = target_md_obj.rename(target_md_obj.with_name(f"{stem}.md"))
+
+    return final_md_path_obj
+
 
 
 if __name__ == "__main__":
