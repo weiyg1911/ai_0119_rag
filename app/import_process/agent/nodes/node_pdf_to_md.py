@@ -43,7 +43,7 @@ def node_pdf_to_md(state: ImportGraphState) -> ImportGraphState:
     zip_url = upload_and_poll(pdf_path_obj)
 
     # 4. step_3_download_and_extract 下载提取和解压
-    md_path_obj = download_and_extract(Path(zip_url), local_dir_obj.path, pdf_path_obj)
+    md_path_obj = download_and_extract(Path(zip_url), local_dir_obj, pdf_path_obj)
 
 
     # 5. 根据md地址读取对应md_content内容,并且更新state
@@ -239,7 +239,24 @@ def upload_and_poll(pdf_path_obj)-> str:
          6. 进行md文件的命名确定 [xx.pdf -> full.md -> xx.md]
          7. 返回md_path_obj地址
 """
-def download_and_extract(zip_url, local_dir_path, pdf_path_obj):
+def download_and_extract(zip_url, local_dir_path_obj, stem):
+
+    response = requests.get(zip_url, timeout=30)
+
+    md_path_dir = local_dir_path_obj / f"{stem}_result.zip"
+
+    md_path_dir.write_bytes(response.content)
+
+    extract_path_obj = local_dir_path_obj / stem
+    if extract_path_obj.exits():
+        shutil.rmtree(extract_path_obj)
+
+    extract_path_obj.mkdir(parents=True, exist_ok=True)
+
+    shutil.unpack_archive(md_path_dir, extract_path_obj)
+
+
+
 
 
     pass
