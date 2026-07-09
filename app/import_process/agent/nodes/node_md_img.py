@@ -7,7 +7,7 @@ import os
 import base64
 from langchain_core.messages import HumanMessage
 
-from app.conf import lm_config
+from app.conf.lm_config import lm_config
 from app.core.load_prompt import load_prompt
 from app.core.logger import logger, node_log
 from app.import_process.agent.state import ImportGraphState
@@ -41,6 +41,7 @@ def get_content(state: ImportGraphState) ->Tuple[str, Path, Path]:
     if not md_content:
         logger.warning("md_content为空")
         state["md_content"] = md_path_obj.read_text(encoding="utf-8")
+        md_content = state["md_content"]
 
     return (md_content, md_path_obj, images_path_obj)
 
@@ -73,7 +74,7 @@ def image_summary(image_context_list, stem) -> Dict[str, str]:
     print(lm_config.lv_model)
     vm = get_llm_client(lm_config.lv_model)
 
-    for image_name, image_path_str, (pre_context, pos_context) in image_context_list:
+    for (image_name, image_path_str,pre_context, pos_context) in image_context_list:
         image_context_prompt = load_prompt("image_summary", root_folder = stem, image_content = [pre_context, pos_context])
         image_data = base64.b64encode(Path(image_path_str).read_bytes()).decode("utf-8")
 
@@ -90,6 +91,8 @@ def image_summary(image_context_list, stem) -> Dict[str, str]:
         summary = vm.invoke(input=[msg])
 
         image_summary_dict[image_name] = summary
+
+        logger.info(f'summary:{summary}')
 
     return image_summary_dict
 
@@ -113,12 +116,15 @@ def node_md_img(state: ImportGraphState) -> ImportGraphState:
 
     image_context_list = scan_images(md_content=md_content, images_path_obj=images_path_obj)
 
+
     image_summary_list = image_summary(image_context_list, md_path_obj.stem)
 
     return state
 
 
 if __name__ == "__main__":
+    from dotenv import load_dotenv
+    load_dotenv()
     """本地测试入口：单独运行该文件时，执行MD图片处理全流程测试"""
     from app.utils.path_util import PROJECT_ROOT
     logger.info(f"本地测试 - 项目根目录：{PROJECT_ROOT}")
