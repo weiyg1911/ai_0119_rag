@@ -5,13 +5,20 @@ import re
 from typing import Tuple,List, Dict
 import os
 import base64
+
+from langchain_community.tools.file_management import delete
 from langchain_core.messages import HumanMessage
+from minio import Minio
+from minio.deleteobjects import DeleteObject
+from sqlalchemy.orm.persistence import delete_obj
 
 from app.conf.lm_config import lm_config
 from app.core.load_prompt import load_prompt
 from app.core.logger import logger, node_log
 from app.import_process.agent.state import ImportGraphState
 from app.lm.lm_utils import get_llm_client
+from app.utils.minio_utils import get_minio_client
+from app.conf.minio_config import minio_config
 
 # MinIO支持的图片格式集合（小写后缀，统一匹配标准）
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"}
@@ -96,6 +103,57 @@ def image_summary(image_context_list, stem) -> Dict[str, str]:
 
     return image_summary_dict
 
+def upload_and_replace(image_context_list, image_summery_dict, md_content, stem) -> str:
+    minio_client = get_minio_client()
+    list_objs = minio_client.list_objects(bucket_name=minio_config.bucket_name, prefix=f"{minio_config.minio_img_dir[1:]}/{stem}/", recursive=True)
+
+    delete_obj_list = [DeleteObject(obj.object_name) for obj in list_objs]
+
+    if not list_objs:
+        errors = minio_client.remove_object(bucket_name=minio_config.bucket_name, object_name=delete_obj_list)
+
+        for err in errors:
+            logger.warning(f"删除失败，原因是{err}")
+
+        logger.debug("删除成功")
+
+    image_minio_dict = {}
+
+    for (image_name, image_path_str, pre_context, pos_context) in image_context_list:
+        try:
+            minio_client.fput_object(
+                bucket_name=minio_config.bucket_name,
+                object_name=f"{minio_config.minio_img_dir}/{stem}/{image_name}",
+                file_path=image_path_str,
+                content_type=mimetypes.guess_type(image_name)[0])
+            image_minio_url = f"http://{minio_config.minio_secure}/{minio_config.bucket_name}{minio_config.minio_img_dir}/{stem}/{image_name}"
+            logger.debug(f"图片{image_name}上传成功， 地址为{image_minio_url}")
+            image_minio_dict[image_name] = image_minio_url
+        except Exception as e:
+            logger.warning(f"本次图片上传失败{image_path_str}")
+            continue
+
+    total_image_info = {}
+
+    for image_name, minio_url in image_minio_dict.items():
+        total_image_info[image_name] = (minio_url, image_summery_dict[image_name])
+
+
+    for image_name,(image_url,image_summary) in total_image_info.items():
+        rep = re.compile(r"\!\[.*?\]\(.*?" + re.escape(image_name) + ".*?\)")
+        md_content =  rep.sub(lambda _:f"![{image_summary}]({image_url})",md_content)
+    # 6. 最终返回md_content
+    return md_content
+
+
+
+def backup_md(new_md_content, md_path_obj):
+    new_md_path_obj = md_path_obj.with_name(f"{md_path_obj.stem}_new.md")
+    # 备份
+    new_md_path_obj.write_text(new_md_content,encoding="utf-8")
+    return str(new_md_path_obj)
+
+
 @node_log("node_md_img")
 def node_md_img(state: ImportGraphState) -> ImportGraphState:
     """
@@ -117,9 +175,15 @@ def node_md_img(state: ImportGraphState) -> ImportGraphState:
     image_context_list = scan_images(md_content=md_content, images_path_obj=images_path_obj)
 
 
-    image_summary_list = image_summary(image_context_list, md_path_obj.stem)
+    image_summary_dict = image_summary(image_context_list, md_path_obj.stem)
+
+    new_md_content = upload_and_replace(image_context_list, image_summary_dict, md_content, md_path_obj.stem)
+
+    new_md_path_str = backup_md(new_md_content, md_path_obj)
 
     return state
+
+
 
 
 if __name__ == "__main__":

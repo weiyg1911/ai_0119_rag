@@ -1,4 +1,5 @@
 from minio import Minio
+import json
 
 from app.conf.minio_config import minio_config
 from app.core.logger import logger, node_log
@@ -10,12 +11,11 @@ def _create_minio_client():
         minio_config.endpoint,
         access_key=minio_config.access_key,
         secret_key=minio_config.secret_key,
-        secure=minio_config.secure,
+        secure=minio_config.minio_secure,
     )
     return client
 
-def _create_minio_bucket():
-    client = get_minio_client()
+def _create_minio_bucket(client):
     if not client.bucket_exists(minio_config.bucket_name):
         client.make_bucket(minio_config.bucket_name)
         policy = {
@@ -30,7 +30,7 @@ def _create_minio_bucket():
                 }
             ]
         }
-        client.set_bucket_policy(minio_config.bucket_name, policy)
+        client.set_bucket_policy(minio_config.bucket_name, json.dumps(policy))
     else:
         logger.info("Minio bucket already exists")
 
@@ -39,6 +39,7 @@ def get_minio_client():
     global _minio_client
     if _minio_client is None:
         client = _create_minio_client()
+        _create_minio_bucket(client)
         _minio_client = client
         return _minio_client
     else:
