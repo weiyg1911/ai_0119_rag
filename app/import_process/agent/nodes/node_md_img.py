@@ -1,10 +1,17 @@
+import mimetypes
 from pathlib import Path
 import sys
 import re
-from typing import Tuple,List
+from typing import Tuple,List, Dict
 import os
+import base64
+from langchain_core.messages import HumanMessage
+
+from app.conf import lm_config
+from app.core.load_prompt import load_prompt
 from app.core.logger import logger, node_log
 from app.import_process.agent.state import ImportGraphState
+from app.lm.lm_utils import get_llm_client
 
 # MinIO支持的图片格式集合（小写后缀，统一匹配标准）
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"}
@@ -59,7 +66,32 @@ def scan_images(md_content, images_path_obj)-> List[Tuple[str, str, Tuple[str, s
 
     return image_context_list
 
+def image_summary(image_context_list, stem) -> Dict[str, str]:
 
+    image_summary_dict = {}
+
+    print(lm_config.lv_model)
+    vm = get_llm_client(lm_config.lv_model)
+
+    for image_name, image_path_str, (pre_context, pos_context) in image_context_list:
+        image_context_prompt = load_prompt("image_summary", root_folder = stem, image_content = [pre_context, pos_context])
+        image_data = base64.b64encode(Path(image_path_str).read_bytes()).decode("utf-8")
+
+        msg = HumanMessage(content=[
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:{mimetypes.guess_type(image_name)[0]};base64,{image_data}"
+                    },
+                },
+                {"type": "text", "text": image_context_prompt},
+            ])
+
+        summary = vm.invoke(input=[msg])
+
+        image_summary_dict[image_name] = summary
+
+    return image_summary_dict
 
 @node_log("node_md_img")
 def node_md_img(state: ImportGraphState) -> ImportGraphState:
@@ -80,6 +112,8 @@ def node_md_img(state: ImportGraphState) -> ImportGraphState:
         return state
 
     image_context_list = scan_images(md_content=md_content, images_path_obj=images_path_obj)
+
+    image_summary_list = image_summary(image_context_list, md_path_obj.stem)
 
     return state
 
