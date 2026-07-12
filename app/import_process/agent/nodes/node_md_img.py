@@ -97,7 +97,7 @@ def image_summary(image_context_list, stem) -> Dict[str, str]:
 
         summary = vm.invoke(input=[msg])
 
-        image_summary_dict[image_name] = summary
+        image_summary_dict[image_name] = summary.content
 
         logger.info(f'summary:{summary}')
 
@@ -126,7 +126,7 @@ def upload_and_replace(image_context_list, image_summery_dict, md_content, stem)
                 object_name=f"{minio_config.minio_img_dir}/{stem}/{image_name}",
                 file_path=image_path_str,
                 content_type=mimetypes.guess_type(image_name)[0])
-            image_minio_url = f"http://{minio_config.minio_secure}/{minio_config.bucket_name}{minio_config.minio_img_dir}/{stem}/{image_name}"
+            image_minio_url = f"http://{minio_config.endpoint}/{minio_config.bucket_name}{minio_config.minio_img_dir}/{stem}/{image_name}"
             logger.debug(f"图片{image_name}上传成功， 地址为{image_minio_url}")
             image_minio_dict[image_name] = image_minio_url
         except Exception as e:
@@ -141,6 +141,7 @@ def upload_and_replace(image_context_list, image_summery_dict, md_content, stem)
 
     for image_name,(image_url,image_summary) in total_image_info.items():
         rep = re.compile(r"\!\[.*?\]\(.*?" + re.escape(image_name) + ".*?\)")
+        logger.info(f"要替换md_content文档了image_summary:{image_summary}, image_url:{image_url}")
         md_content =  rep.sub(lambda _:f"![{image_summary}]({image_url})",md_content)
     # 6. 最终返回md_content
     return md_content
