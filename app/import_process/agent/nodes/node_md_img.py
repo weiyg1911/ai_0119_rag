@@ -109,8 +109,8 @@ def upload_and_replace(image_context_list, image_summery_dict, md_content, stem)
 
     delete_obj_list = [DeleteObject(obj.object_name) for obj in list_objs]
 
-    if not list_objs:
-        errors = minio_client.remove_object(bucket_name=minio_config.bucket_name, object_name=delete_obj_list)
+    if list_objs:
+        errors = minio_client.remove_objects(bucket_name=minio_config.bucket_name, delete_object_list=delete_obj_list)
 
         for err in errors:
             logger.warning(f"删除失败，原因是{err}")
