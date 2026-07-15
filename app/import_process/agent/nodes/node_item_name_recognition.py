@@ -33,6 +33,7 @@ SINGLE_CHUNK_CONTENT_MAX_LEN = 800
 # 大模型上下文总字符数上限：适配主流大模型输入限制，默认2500
 CONTEXT_TOTAL_MAX_CHARS = 10000
 
+@step_log("step1_check_content 校验chunks与file_title")
 def step1_check_content(state: ImportGraphState):
     chunks = state["chunks"]
     file_title = state["file_title"]
@@ -49,6 +50,7 @@ def step1_check_content(state: ImportGraphState):
 
     return chunks, file_title
 
+@step_log("step2_get_item_name_from_modal LLM识别主体名称")
 def step2_get_item_name_from_modal(state: ImportGraphState):
     file_title = state["file_title"]
 
@@ -107,6 +109,14 @@ def _create_collection(client: get_milvus_client):
         index_params=index_params,
     )
 
+@step_log("step3_embed_item_name 主体名称向量化")
+def step3_embed_item_name(item_name: str):
+    result = generate_embeddings([item_name])
+    dense_vector = result["dense"][0]
+    sparse_vector = result["sparse"][0]
+    return dense_vector, sparse_vector
+
+@step_log("step_4_invert_item_name 写入Milvus主体名称库")
 def step_4_invert_item_name(item_name:str, file_title:str, dense_vector, sparse_vector):
     # 连接milvus的客户端
     # 创建表对应的schema
@@ -145,6 +155,7 @@ def node_item_name_recognition(state: ImportGraphState) -> ImportGraphState:
     2. 调用 LLM 识别这篇文档讲的是什么东西 (如: "Fluke 17B+ 万用表")。
     3. 存入 state["item_name"] 用于后续数据幂等性清理。
     """
+    add_running_task(state["task_id"], "node_item_name_recognition")
 
     step1_check_content(state)
     item_name = step2_get_item_name_from_modal(state)
@@ -153,13 +164,11 @@ def node_item_name_recognition(state: ImportGraphState) -> ImportGraphState:
     for chunk in chunks:
         chunk['item_name'] = item_name
 
-    result = generate_embeddings([item_name])
-
-    dense_vector = result["dense"][0]
-    sparse_vector = result["sparse"][0]
+    dense_vector, sparse_vector = step3_embed_item_name(item_name)
 
     step_4_invert_item_name(item_name=item_name, file_title=item_name, dense_vector=dense_vector, sparse_vector=sparse_vector)
 
+    add_done_task(state["task_id"], "node_item_name_recognition")
     return state
 
 

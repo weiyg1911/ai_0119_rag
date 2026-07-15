@@ -2,8 +2,9 @@ import sys
 
 from app.clients.milvus_utils import get_milvus_client
 from app.conf.milvus_config import milvus_config
-from app.core.logger import logger, node_log
+from app.core.logger import logger, node_log, step_log
 from app.import_process.agent.state import ImportGraphState
+from app.utils.task_utils import add_running_task, add_done_task
 from pymilvus import DataType
 
 def _create_collection(client: get_milvus_client):
@@ -45,6 +46,7 @@ def _create_collection(client: get_milvus_client):
     )
 
 
+@step_log("step_1_insert_data 幂等清理并写入chunks")
 def step_1_insert_data(state: ImportGraphState):
     chunks = state["chunks"]
     item_name = state["item_name"]
@@ -89,7 +91,9 @@ def node_import_milvus(state: ImportGraphState) -> ImportGraphState:
     2. 根据 item_name 删除旧数据 (幂等性)。
     3. 批量插入新的向量数据。
     """
+    add_running_task(state["task_id"], "node_import_milvus")
     step_1_insert_data(state)
+    add_done_task(state["task_id"], "node_import_milvus")
     return state
 
 if __name__ == '__main__':

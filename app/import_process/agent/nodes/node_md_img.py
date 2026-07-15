@@ -14,11 +14,12 @@ from sqlalchemy.orm.persistence import delete_obj
 
 from app.conf.lm_config import lm_config
 from app.core.load_prompt import load_prompt
-from app.core.logger import logger, node_log
+from app.core.logger import logger, node_log, step_log
 from app.import_process.agent.state import ImportGraphState
 from app.lm.lm_utils import get_llm_client
 from app.utils.minio_utils import get_minio_client
 from app.conf.minio_config import minio_config
+from app.utils.task_utils import add_running_task, add_done_task
 
 # MinIO支持的图片格式集合（小写后缀，统一匹配标准）
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"}
@@ -31,6 +32,7 @@ def is_supported_image(filename: str) -> bool:
     """
     return os.path.splitext(filename)[1].lower() in IMAGE_EXTENSIONS
 
+@step_log("get_content 获取md内容与图片目录")
 def get_content(state: ImportGraphState) ->Tuple[str, Path, Path]:
     md_content = state["md_content"]
     md_path = state["md_path"]
@@ -52,6 +54,7 @@ def get_content(state: ImportGraphState) ->Tuple[str, Path, Path]:
 
     return (md_content, md_path_obj, images_path_obj)
 
+@step_log("scan_images 扫描md中的图片及上下文")
 def scan_images(md_content, images_path_obj)-> List[Tuple[str, str, Tuple[str, str]]]:
 
     
@@ -74,6 +77,7 @@ def scan_images(md_content, images_path_obj)-> List[Tuple[str, str, Tuple[str, s
 
     return image_context_list
 
+@step_log("image_summary 多模态生成图片摘要")
 def image_summary(image_context_list, stem) -> Dict[str, str]:
 
     image_summary_dict = {}
@@ -103,6 +107,7 @@ def image_summary(image_context_list, stem) -> Dict[str, str]:
 
     return image_summary_dict
 
+@step_log("upload_and_replace 上传图片并替换md链接")
 def upload_and_replace(image_context_list, image_summery_dict, md_content, stem) -> str:
     minio_client = get_minio_client()
     list_objs = minio_client.list_objects(bucket_name=minio_config.bucket_name, prefix=f"{minio_config.minio_img_dir[1:]}/{stem}/", recursive=True)
@@ -148,6 +153,7 @@ def upload_and_replace(image_context_list, image_summery_dict, md_content, stem)
 
 
 
+@step_log("backup_md 备份处理后的md文件")
 def backup_md(new_md_content, md_path_obj):
     new_md_path_obj = md_path_obj.with_name(f"{md_path_obj.stem}_new.md")
     # 备份
@@ -166,11 +172,13 @@ def node_md_img(state: ImportGraphState) -> ImportGraphState:
     3. (可选) 调用多模态模型生成图片描述。
     4. 替换 Markdown 中的图片链接为 MinIO URL。
     """
+    add_running_task(state["task_id"], "node_md_img")
 
     (md_content, md_path_obj, images_path_obj) = get_content(state=state)
 
     if not images_path_obj.exists() or len(list(images_path_obj.iterdir())) == 0:
         logger.warning("md文件中没有任何图片")
+        add_done_task(state["task_id"], "node_md_img")
         return state
 
     image_context_list = scan_images(md_content=md_content, images_path_obj=images_path_obj)
@@ -182,6 +190,7 @@ def node_md_img(state: ImportGraphState) -> ImportGraphState:
 
     new_md_path_str = backup_md(new_md_content, md_path_obj)
 
+    add_done_task(state["task_id"], "node_md_img")
     return state
 
 

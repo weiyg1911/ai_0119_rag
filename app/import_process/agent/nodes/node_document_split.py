@@ -5,7 +5,7 @@ import sys
 
 from pathlib import Path
 
-from app.core.logger import logger, node_log
+from app.core.logger import logger, node_log, step_log
 from app.import_process.agent.state import ImportGraphState
 from app.utils.task_utils import add_running_task, add_done_task
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -25,6 +25,7 @@ def is_title(inputStr:str):
 def is_code_tag(inputStr:str):
     return  inputStr.startswith("```") or inputStr.startswith("~~~")
 
+@step_log("step_1_check_value 校验并规范化md内容")
 def step_1_check_value(state: ImportGraphState):
     md_content = state["md_content"]
     file_title = state["file_title"]
@@ -49,6 +50,7 @@ def step_1_check_value(state: ImportGraphState):
 
 
 
+@step_log("step_2_content_to_chunks 按标题切分chunks")
 def step_2_content_to_chunks(state: ImportGraphState):
     file_title = state["file_title"]
     content_list = state["md_content"].split("\n")
@@ -94,6 +96,7 @@ def step_2_content_to_chunks(state: ImportGraphState):
     return chunk_list
 
 
+@step_log("step_3_chunks_detail 过长chunk二次切分")
 def step_3_chunks_detail(chunk_list, state: ImportGraphState):
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=CHUNK_SIZE,
@@ -131,6 +134,7 @@ def step_3_chunks_detail(chunk_list, state: ImportGraphState):
 
     return final_chunk_list
 
+@step_log("step_4_save_chunks 落盘保存chunks")
 def step_4_save_chunks(chunk_list, state: ImportGraphState):
     md_path = state["md_path"]
     md_path_obj = Path(md_path)

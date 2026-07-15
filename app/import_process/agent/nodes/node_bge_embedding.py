@@ -5,10 +5,12 @@ from pymilvus import DataType
 
 from app.clients.milvus_utils import get_milvus_client
 from app.conf.milvus_config import milvus_config
-from app.core.logger import logger, node_log
+from app.core.logger import logger, node_log, step_log
 from app.import_process.agent.state import ImportGraphState
 from app.lm.embedding_utils import get_bge_m3_ef, generate_embeddings
+from app.utils.task_utils import add_running_task, add_done_task
 
+@step_log("step_1_chunks_embedding 批量向量化chunks")
 def step_1_chunks_embedding(state: ImportGraphState):
     chunks = state['chunks']
     if not chunks:
@@ -51,7 +53,9 @@ def node_bge_embedding(state: ImportGraphState) -> ImportGraphState:
     2. 对每个 Chunk 的文本进行 Dense (稠密) 和 Sparse (稀疏) 向量化。
     3. 准备好写入 Milvus 的数据格式。
     """
+    add_running_task(state["task_id"], "node_bge_embedding")
     step_1_chunks_embedding(state)
+    add_done_task(state["task_id"], "node_bge_embedding")
     return state
 
 

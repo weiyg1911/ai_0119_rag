@@ -34,7 +34,7 @@ def node_pdf_to_md(state: ImportGraphState) -> ImportGraphState:
     节点: PDF转Markdown (node_pdf_to_md)
     """
     # 1. 日志+进行中的任务记录 add_running_task
-    add_running_task(state["task_id"], "node_entry")
+    add_running_task(state["task_id"], "node_pdf_to_md")
 
     # 2. step_1_validate_paths 校验pdf和输出地址
     pdf_path_obj, local_dir_obj = validate_paths(state)
@@ -52,7 +52,7 @@ def node_pdf_to_md(state: ImportGraphState) -> ImportGraphState:
     state["md_path"] = str(md_path_obj)
 
     # 6. 日志+完成的任务记录  add_done_task
-    add_done_task(state["task_id"],"node_entry")
+    add_done_task(state["task_id"], "node_pdf_to_md")
     return state
 
 
