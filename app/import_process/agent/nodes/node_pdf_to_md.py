@@ -49,6 +49,7 @@ def node_pdf_to_md(state: ImportGraphState) -> ImportGraphState:
     # 5. 根据md地址读取对应md_content内容,并且更新state
     md_content = md_path_obj.read_text(encoding='utf-8')
     state["md_content"] = md_content
+    state["md_path"] = str(md_path_obj)
 
     # 6. 日志+完成的任务记录  add_done_task
     add_done_task(state["task_id"],"node_entry")
