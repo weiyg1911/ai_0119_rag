@@ -218,7 +218,7 @@ def upload_and_poll(pdf_path_obj)-> str:
                 elif extract_result['state'] == 'failed':
                     msg = f"已经完成了解析，但是失败了，失败信息：{extract_result}"
                     logger.error(msg)
-                    raise RuntimeError("msg")
+                    raise RuntimeError(msg)
                     break
                 else:
                     logger.info(f"解析进行中，{extract_result['state']}")
